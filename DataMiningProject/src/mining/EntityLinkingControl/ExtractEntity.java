@@ -1,4 +1,4 @@
-package mining.ExtractEntity;
+package mining.EntityLinkingControl;
 
 
 import java.io.*;
@@ -31,19 +31,45 @@ import java.util.ArrayList;
 
 public class ExtractEntity {
 	private ArrayList<Parse> nounPhrases = new ArrayList<Parse>();
-		
+	private ArrayList<String> nameEntitiesAll = new ArrayList<String>();	
 	
-	public ArrayList<Parse> extractNounPhrases(String inputString) throws InvalidFormatException, IOException{
+	
+	public void extractNameEntities(String inputString) throws InvalidFormatException, IOException{
+		//System.out.println(inputString);
 		Parse[] topParses = Parse(inputString);
+		
 		for (Parse p : topParses) {
 			p.show();
 			findNounPhrases(p);
+			
+			/*
+			String[] words = new String[nounPhrases.size()];
+			int i = 0;
+			for(Parse n : nounPhrases){
+				words[i] = replaceExtraChar(n.toString());
+				i++;
+			}
+			
+			ArrayList<String> name = new ArrayList<String>();
+			name.clear();
+			name = findNameEntity(words);
+			if(name.size() != 0)
+				nameEntitiesAll.addAll(name);
+			for(String namee : nameEntitiesAll)
+				System.out.println(namee);
+			*/
 		}
-		return nounPhrases;
+		for (Parse noun: nounPhrases) {
+			nameEntitiesAll.add(noun.toString());
+		}
+	}
+	
+	public ArrayList<String> getNameEntities(){
+		return nameEntitiesAll;
 	}
 	
 	public Parse[] Parse(String inputString) throws InvalidFormatException, IOException {
-		InputStream is = new FileInputStream("./src/Mining/ExtractEntity/en-parser-chunking.zip");
+		InputStream is = new FileInputStream("./src/Mining/EntityLinkingControl/en-parser-chunking.zip");
 	 
 		ParserModel model = new ParserModel(is);
 	 
@@ -58,6 +84,7 @@ public class ExtractEntity {
 	}
 	
 	public void findNounPhrases(Parse p) {
+		
 	    if (p.getType().equals("NP") || p.getType().equals("NNP") || p.getType().equals("NNPS")) {
 	    	int count = 0;
 	    	for (Parse child : p.getChildren()) {
@@ -74,25 +101,8 @@ public class ExtractEntity {
 	    }
 	}
 	
-	
-	
-	public ArrayList<ArrayList<String[]>> extractNameEntity(String paragraph) throws InvalidFormatException, IOException{
-		String[] sentences = findSentences(paragraph);
-		ArrayList<String[]> tokens = new ArrayList<String[]>();
-		ArrayList<ArrayList<String[]>> nameEntities = new ArrayList<ArrayList<String[]>>();
-		
-		for(int i=0; i<sentences.length; i++) {
-			tokens.add(findTokens(sentences[i]));
-		}
-		
-		for(String[] entity : tokens){
-			nameEntities.add(findNameEntity(entity));
-		}
-		return nameEntities;
-	}
-	
 	public String[] findSentences(String paragraph) throws InvalidFormatException, IOException{
-		InputStream is = new FileInputStream("./src/Mining/ExtractEntity/en-sent.zip");
+		InputStream is = new FileInputStream("./src/Mining/EntityLinkingControl/en-sent.zip");
 		SentenceModel sentenceModel = new SentenceModel(is);
 		SentenceDetectorME sdetector = new SentenceDetectorME(sentenceModel);
 	 
@@ -103,7 +113,7 @@ public class ExtractEntity {
 	}
 	
 	public String[] findTokens(String inputSentences) throws InvalidFormatException, IOException{
-		InputStream is = new FileInputStream("./src/Mining/ExtractEntity/en-token.zip");
+		InputStream is = new FileInputStream("./src/Mining/EntityLinkingControl/en-token.zip");
 		TokenizerModel tokenModel = new TokenizerModel(is);
 		Tokenizer tokenizer = new TokenizerME(tokenModel);
 	    
@@ -115,9 +125,9 @@ public class ExtractEntity {
 	    return wordsArr;
 	}
 	
-	public ArrayList<String[]> findNameEntity(String[] inputWords) throws InvalidFormatException, IOException{
+	public ArrayList<String> findNameEntity(String[] inputWords) throws InvalidFormatException, IOException{
 		//find Person
-		InputStream is = new FileInputStream("./src/Mining/ExtractEntity/en-ner-person.zip");
+		InputStream is = new FileInputStream("./src/Mining/EntityLinkingControl/en-ner-person.zip");
 		TokenNameFinderModel nameModel = new TokenNameFinderModel(is);
 		NameFinderME nameFinder = new NameFinderME(nameModel);
 	         
@@ -125,7 +135,7 @@ public class ExtractEntity {
 	    
 	    
 	    //find location
-	    is = new FileInputStream("./src/Mining/ExtractEntity/en-ner-location.zip");
+	    is = new FileInputStream("./src/Mining/EntityLinkingControl/en-ner-location.zip");
         nameModel = new TokenNameFinderModel(is);
         nameFinder = new NameFinderME(nameModel);
         
@@ -133,62 +143,75 @@ public class ExtractEntity {
         
         
         //find organization
-        is = new FileInputStream("./src/Mining/ExtractEntity/en-ner-organization.zip");
+        is = new FileInputStream("./src/Mining/EntityLinkingControl/en-ner-organization.zip");
         nameModel = new TokenNameFinderModel(is);
         nameFinder = new NameFinderME(nameModel);
         
         Span organizationSpans[] = nameFinder.find(inputWords);
 	    
         
-        String[] nameEntity; 
-        ArrayList<String[]> nameEntities = new ArrayList<String[]>();
+        String nameEntity; 
+        ArrayList<String> nameEntities = new ArrayList<String>();
         
-        int i = 0;
+        boolean contain = false;
         for(Span s: personSpans) {
-        	nameEntity = new String[2]; 
-        	nameEntity[1] = "";
+        	nameEntity = "";
             for(int j=s.getStart(); j<s.getEnd(); j++) {
                 if(j != s.getStart())
-                    nameEntity[1] += " ";
-                nameEntity[1] += inputWords[j];
+                    nameEntity += " ";
+                nameEntity += inputWords[j];
             }
-            nameEntity[0] = "Person";
-            nameEntities.add(nameEntity);
-            i++;
+            contain = false;
+            for (String name : nameEntities)
+            	if (name.equals(nameEntity))
+            		contain = true;
+            if(!contain) {
+            	nameEntities.add(nameEntity);
+            	System.out.println(nameEntity);
+            }
         }
-
+        
         for(Span s: locationSpans) {
-        	nameEntity = new String[2]; 
-        	nameEntity[1] = "";
+        	nameEntity = "";
             for(int j=s.getStart(); j<s.getEnd(); j++) {
                 if(j != s.getStart())
-                    nameEntity[1] += " ";
-                nameEntity[1] += inputWords[j];
+                    nameEntity += " ";
+                nameEntity += inputWords[j];
             }
-            nameEntity[0] = "Location";
-            nameEntities.add(nameEntity);
-            i++;
+            contain = false;
+            for (String name : nameEntities)
+            	if (name.equals(nameEntity))
+            		contain = true;
+            if(!contain) {
+            	nameEntities.add(nameEntity);
+            	System.out.println(nameEntity);
+            }
         }
         
         for(Span s: organizationSpans) {
-        	nameEntity = new String[2]; 
-        	nameEntity[1] = "";
+        	nameEntity = "";
             for(int j=s.getStart(); j<s.getEnd(); j++) {
                 if(j != s.getStart())
-                    nameEntity[1] += " ";
-                nameEntity[1] += inputWords[j];
+                    nameEntity += " ";
+                nameEntity += inputWords[j];
             }
-            nameEntity[0] = "Organization";
-            nameEntities.add(nameEntity);
-            i++;
+            contain = false;
+            for (String name : nameEntities)
+            	if (name.equals(nameEntity))
+            		contain = true;
+            if(!contain) {
+            	nameEntities.add(nameEntity);
+            	System.out.println(nameEntity);
+            }
         }
 
 	    is.close();
+	    
 	    return nameEntities;
 	}
 	
 	public static void POSTag() throws IOException {
-		POSModel model = new POSModelLoader().load(new File("./src/Mining/ExtractEntity/en-pos-maxent.zip"));
+		POSModel model = new POSModelLoader().load(new File("./src/Mining/EntityLinkingControl/en-pos-maxent.zip"));
 		PerformanceMonitor perfMon = new PerformanceMonitor(System.err, "sent");
 		POSTaggerME tagger = new POSTaggerME(model);
 	 
@@ -213,7 +236,7 @@ public class ExtractEntity {
 		perfMon.stopAndPrintFinalResult();
 		
 		// chunker
-		InputStream is = new FileInputStream("./src/Mining/ExtractEntity/en-chunker.zip");
+		InputStream is = new FileInputStream("./src/Mining/EntityLinkingControl/en-chunker.zip");
 		ChunkerModel cModel = new ChunkerModel(is);
 	 
 		ChunkerME chunkerME = new ChunkerME(cModel);
@@ -227,5 +250,10 @@ public class ExtractEntity {
 			System.out.println(s.toString());
 	}
 	
+	public String replaceExtraChar(String input){
+		input = input.replace("'s", "");
+		input = input.replaceAll("[@#\\%,\\.]", "");
+		return input;
+	}
 	
 }
